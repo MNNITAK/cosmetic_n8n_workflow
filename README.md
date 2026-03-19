@@ -18,7 +18,27 @@
 
 ## 📺 Demo
 
+<<<<<<< HEAD
 https://github.com/user-attachments/assets/356c6cbe-2482-4e41-a646-5a8e3c632415
+=======
+> 🎬 **Video walkthrough coming soon** — showing full pipeline run on Soulflower vs WOW vs Mamaearth
+
+<!-- 
+  ============================================================
+  REPLACE THIS SECTION WITH YOUR LOOM / YOUTUBE VIDEO LINK
+  ============================================================
+  
+  Option 1 — Loom:
+  [![Watch Demo](https://cdn.loom.com/sessions/thumbnails/YOUR_LOOM_ID-with-play.gif)](https://www.loom.com/share/YOUR_LOOM_ID)
+  
+
+  ============================================================
+
+https://github.com/user-attachments/assets/356c6cbe-2482-4e41-a646-5a8e3c632415
+
+
+-->
+>>>>>>> 237c51d46c89054a0474b082b189aa4a755ffaa4
 
 ---
 
