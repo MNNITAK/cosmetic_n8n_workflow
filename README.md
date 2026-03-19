@@ -28,12 +28,12 @@
   Option 1 — Loom:
   [![Watch Demo](https://cdn.loom.com/sessions/thumbnails/YOUR_LOOM_ID-with-play.gif)](https://www.loom.com/share/YOUR_LOOM_ID)
   
-  Option 2 — YouTube:
-  [![Watch Demo](https://img.youtube.com/vi/YOUR_VIDEO_ID/maxresdefault.jpg)](https://www.youtube.com/watch?v=YOUR_VIDEO_ID)
-  
-  Option 3 — GIF of dashboard:
-  ![SoulSpy Demo](./assets/demo.gif)
+
   ============================================================
+
+https://github.com/user-attachments/assets/356c6cbe-2482-4e41-a646-5a8e3c632415
+
+
 -->
 
 ---
