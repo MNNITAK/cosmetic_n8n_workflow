@@ -312,12 +312,7 @@ Production agentic systems need human oversight mechanisms. The IF node routing 
 
 ---
 
-## 👤 Author
 
-**Akshay** — MBA Student  
-Built as part of internship application project for Soulflower's Transformational Practice Intern role.
-
----
 
 ## ⚠️ Disclaimer
 
