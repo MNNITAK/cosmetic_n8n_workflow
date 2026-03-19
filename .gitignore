@@ -1,0 +1,19 @@
+# Environment variables — NEVER commit this
+.env
+.env.local
+.env.production
+
+# Google OAuth client secret — NEVER commit this
+client_secret_*.json
+
+# n8n local data
+.n8n/
+n8n_data/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/

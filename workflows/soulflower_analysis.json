@@ -1,0 +1,389 @@
+{
+  "name": "Soulflower Competitor Analysis",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "daysInterval": 9
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -1728,
+        -64
+      ],
+      "id": "9f51f075-46db-4a12-ae63-c81c69dc5a15",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "Run actor and get dataset",
+        "actorSource": "store",
+        "actorId": {
+          "__rl": true,
+          "value": "yRevUKZ4qjYcHZYuq",
+          "mode": "list",
+          "cachedResultName": "Amazon Product Reviews Scraper (getdataforme/amazon-product-reviews-scraper)",
+          "cachedResultUrl": "https://console.apify.com/actors/yRevUKZ4qjYcHZYuq/input"
+        },
+        "customBody": "{\n  \"urls\": [\n    \"https://www.amazon.in/dp/B078V9X189\",\n    \"https://www.amazon.in/dp/B0991ZYLRW\",\n    \"https://www.amazon.in/dp/B0CCHV3J5W\",\n    \"https://www.amazon.in/dp/B07YNHHH5N\",\n    \"https://www.amazon.in/dp/B0C6ML81SF\",\n    \"https://www.amazon.in/dp/B099F3WJKW\"\n  ],\n  \"maxReviews\": 30,\n  \"sort\": \"recent\"\n}",
+        "timeout": {}
+      },
+      "type": "@apify/n8n-nodes-apify.apify",
+      "typeVersion": 1,
+      "position": [
+        -1536,
+        -64
+      ],
+      "id": "f8482895-c7b8-4e1a-854f-34efbe5ccdb2",
+      "name": "Run an Actor and get dataset",
+      "credentials": {
+        "apifyApi": {
+          "id": "APIFY_CREDENTIAL_ID",
+          "name": "Apify account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const reviewsRaw = $input.all().map(item => item.json);\n\nconst URL_BRAND_MAP = {\n  \"B078V9X189\": \"Soulflower\",\n  \"B0991ZYLRW\": \"Soulflower\",\n  \"B0CCHV3J5W\": \"WOW\",\n  \"B07YNHHH5N\": \"WOW\",\n  \"B0C6ML81SF\": \"Mamaearth\",\n  \"B099F3WJKW\": \"Mamaearth\"\n};\n\nconst seen = new Set();\nconst cleaned = [];\n\nfor (const r of reviewsRaw) {\n  const productId = r.Product_Id || \"\";\n  const brand = URL_BRAND_MAP[productId] || \"Unknown\";\n\n  const reviewText = (r.Body || r.Full_Review || \"\").trim();\n  if (!reviewText) continue;\n\n  const hash = reviewText.slice(0, 60);\n  if (seen.has(hash)) continue;\n  seen.add(hash);\n\n  const rating = parseFloat(r.Rating) || 0;\n  const verified = r.Review_Type === \"Verified Purchase\";\n\n  const now = new Date();\n  const startOfYear = new Date(now.getFullYear(), 0, 1);\n  const weekNumber = Math.ceil(((now - startOfYear) / 86400000 + startOfYear.getDay() + 1) / 7);\n\n  cleaned.push({\n    brand,\n    product_id: productId,\n    rating,\n    review_text: reviewText,\n    title: (r.Title || \"\").trim(),\n    verified,\n    week_number: weekNumber,\n    date: now.toISOString().split(\"T\")[0]\n  });\n}\n\nconst byBrand = {};\nfor (const r of cleaned) {\n  byBrand[r.brand] = (byBrand[r.brand] || 0) + 1;\n}\n\nreturn [{\n  json: {\n    cleaned_reviews: cleaned,\n    total: cleaned.length,\n    by_brand: byBrand\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1344,
+        -64
+      ],
+      "id": "a84f4d22-c569-40b6-a839-9bc82fd44b05",
+      "name": "Data_cleaning"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json.cleaned_reviews;\n\nconst PRODUCT_DETAILS = {\n  \"B078V9X189\": { brand: \"Soulflower\", category: \"Hair Oil\",  product_name: \"Soulflower Rosemary Hair Oil\" },\n  \"B0991ZYLRW\": { brand: \"Soulflower\", category: \"Shampoo\",   product_name: \"Soulflower Aloevera Fenugreek Shampoo\" },\n  \"B0CCHV3J5W\": { brand: \"WOW\",        category: \"Hair Oil\",  product_name: \"WOW Rosemary Hair Oil\" },\n  \"B07YNHHH5N\": { brand: \"WOW\",        category: \"Shampoo\",   product_name: \"WOW Onion Shampoo\" },\n  \"B0C6ML81SF\": { brand: \"Mamaearth\",  category: \"Hair Oil\",  product_name: \"Mamaearth Rosemary Hair Oil\" },\n  \"B099F3WJKW\": { brand: \"Mamaearth\",  category: \"Shampoo\",   product_name: \"Mamaearth Onion Shampoo\" }\n};\n\nconst categorized = data.map(r => {\n  const details = PRODUCT_DETAILS[r.product_id] || {};\n  return {\n    ...r,\n    category: details.category || \"Unknown\",\n    product_name: details.product_name || \"Unknown\"\n  };\n});\n\nconst byBrand = {};\nfor (const r of categorized) {\n  if (!byBrand[r.brand]) byBrand[r.brand] = [];\n  byBrand[r.brand].push(r);\n}\n\nconst byBrandCategory = {};\nfor (const r of categorized) {\n  const key = `${r.brand}_${r.category}`;\n  if (!byBrandCategory[key]) byBrandCategory[key] = [];\n  byBrandCategory[key].push(r);\n}\n\nconst byCategory = {};\nfor (const r of categorized) {\n  if (!byCategory[r.category]) byCategory[r.category] = [];\n  byCategory[r.category].push(r);\n}\n\nconst summary = {};\nfor (const [key, reviews] of Object.entries(byBrandCategory)) {\n  const avgRating = reviews.reduce((a, r) => a + r.rating, 0) / reviews.length;\n  summary[key] = {\n    count: reviews.length,\n    avg_rating: Math.round(avgRating * 100) / 100\n  };\n}\n\nreturn [{\n  json: {\n    cleaned_reviews: categorized,\n    by_brand: byBrand,\n    by_brand_category: byBrandCategory,\n    by_category: byCategory,\n    summary,\n    total: categorized.length\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1136,
+        -64
+      ],
+      "id": "3f87d30b-8485-4148-b7d3-dd63dc6f4146",
+      "name": "categorised_by_productType"
+    },
+    {
+      "parameters": {
+        "resource": "document",
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-pro",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-pro"
+        },
+        "text": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"You are a competitive intelligence agent for a D2C skincare brand. You will be given real Amazon review data for 3 brands — Soulflower, WOW, and Mamaearth — across two product categories: Hair Oil and Shampoo. Analyze this data deeply and return ONLY a valid JSON object with NO markdown, NO backticks, NO extra text whatsoever. Required keys: soulflower_strengths (array of 3 specific strings based on reviews), soulflower_vulnerabilities (array of 3 specific strings based on reviews), wow_weaknesses (array of 2 strings), mamaearth_weaknesses (array of 2 strings), highest_threat_competitor (string — WOW or Mamaearth, with one line reason), soulflower_hair_oil_sentiment (string — Positive/Neutral/Negative), soulflower_shampoo_sentiment (string — Positive/Neutral/Negative), top_complaints_soulflower (array of 3 strings), top_praises_soulflower (array of 3 strings), key_trends (array of 2 strings), data_confidence (number 0-10). Here is the raw review data by brand and category: {{ JSON.stringify($json.by_brand_category) }}\"\n    }]\n  }]\n}{\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"You are a competitive intelligence agent for a D2C skincare brand. You will be given real Amazon review data for 3 brands — Soulflower, WOW, and Mamaearth — across two product categories: Hair Oil and Shampoo. Analyze this data deeply and return ONLY a valid JSON object with NO markdown, NO backticks, NO extra text whatsoever. Required keys: soulflower_strengths (array of 3 specific strings based on reviews), soulflower_vulnerabilities (array of 3 specific strings based on reviews), wow_weaknesses (array of 2 strings), mamaearth_weaknesses (array of 2 strings), highest_threat_competitor (string — WOW or Mamaearth, with one line reason), soulflower_hair_oil_sentiment (string — Positive/Neutral/Negative), soulflower_shampoo_sentiment (string — Positive/Neutral/Negative), top_complaints_soulflower (array of 3 strings), top_praises_soulflower (array of 3 strings), key_trends (array of 2 strings), data_confidence (number 0-10). Here is the raw review data by brand and category: {{ JSON.stringify($json.by_brand_category) }}\"\n    }]\n  }]\n}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        -944,
+        -64
+      ],
+      "id": "d931441a-6504-4518-9b2b-8e986fb9b3f0",
+      "name": "Gap Analyst",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "GEMINI_CREDENTIAL_ID",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "document",
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-pro",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-pro"
+        },
+        "text": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"You are a D2C brand growth strategy agent for Soulflower skincare. Based on the competitive intelligence provided, generate specific actionable recommendations. Return ONLY a valid JSON object with NO markdown, NO backticks, NO extra text. Required keys: product_improvements (array of 3 specific actionable strings), marketing_angles (array of 3 strings — based on competitor weaknesses), urgent_fixes (array of 2 strings — things to fix immediately), weekly_priority (single most important action this week as string), confidence_score (number 0-10). Intelligence data: Soulflower Strengths: {{ $json.soulflower_strengths }} Soulflower Vulnerabilities: {{ $json.soulflower_vulnerabilities }} WOW Weaknesses: {{ $json.wow_weaknesses }} Mamaearth Weaknesses: {{ $json.mamaearth_weaknesses }} Highest Threat: {{ $json.highest_threat_competitor }} Top Complaints: {{ $json.top_complaints_soulflower }} Key Trends: {{ $json.key_trends }}\"\n    }]\n  }]\n}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        -528,
+        -64
+      ],
+      "id": "b3e45358-905d-40ff-89a6-d20f07f7e683",
+      "name": "Strategist",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "GEMINI_CREDENTIAL_ID",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "document",
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-pro",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-pro"
+        },
+        "text": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"You are an executive reporting agent for a D2C skincare brand. Synthesize the competitive intelligence and strategy into a crisp weekly brand report for senior management. Return ONLY a valid JSON object with NO markdown, NO backticks, NO extra text. Required keys: executive_summary (max 80 words as single string), brand_health_score (number 0-10), top_3_actions (array of 3 short strings — max 10 words each), competitive_position (exactly one of: Leader, Challenger, Follower), alert (string if any urgent issue exists or null). Use this data: Product Improvements: {{ $json.product_improvements }} Marketing Angles: {{ $json.marketing_angles }} Urgent Fixes: {{ $json.urgent_fixes }} Weekly Priority: {{ $json.weekly_priority }} Confidence Score: {{ $json.confidence_score }}\"\n    }]\n  }]\n}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        -112,
+        -64
+      ],
+      "id": "97f1afdb-dab3-4b8d-9d40-99e8e5bd7cfc",
+      "name": "Analyze document",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "GEMINI_CREDENTIAL_ID",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.GOOGLE_SHEETS_DOC_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "url"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $now.toFormat('yyyy-MM-dd') }}",
+            "Competitive Position": "={{ $json.competitive_position }}",
+            "Brand Health Score": "={{ $json.brand_health_score }}",
+            "Top Action 1": "={{ $json.top_3_actions[0] }}",
+            "Top Action 2": "={{ $json.top_3_actions[1] }}",
+            "Top Action 3": "={{ $json.top_3_actions[2] }}",
+            "Alert": "={{ $json.alert }}",
+            "Executive Summary": "={{ $json.executive_summary }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "Date", "displayName": "Date", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Brand Health Score", "displayName": "Brand Health Score", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Competitive Position", "displayName": "Competitive Position", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Top Action 1", "displayName": "Top Action 1", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Top Action 2", "displayName": "Top Action 2", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Top Action 3", "displayName": "Top Action 3", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Alert", "displayName": "Alert", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Executive Summary", "displayName": "Executive Summary", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [ 240, -64 ],
+      "id": "9f4b1a34-cc7d-405f-b38b-4180c87f441f",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.GOOGLE_SHEETS_DOC_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=311844997",
+          "mode": "url"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $now.toFormat('yyyy-MM-dd') }}",
+            "Oil Sentiment": "={{ $().item.json.soulflower_hair_oil_sentiment }}",
+            "Shampoo Sentiment": "={{ $().item.json.top_praises_soulflower[0] }}",
+            "Top Praise": "={{ $().item.json.top_praises_soulflower[0] }}",
+            "Top Complaint": "={{ $().item.json.top_complaints_soulflower[0] }}",
+            "Highest Threat": "={{ $().item.json.highest_threat_competitor }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "Date", "displayName": "Date", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Oil Sentiment", "displayName": "Oil Sentiment", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Shampoo Sentiment", "displayName": "Shampoo Sentiment", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Top Praise", "displayName": "Top Praise", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Top Complaint", "displayName": "Top Complaint", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Highest Threat", "displayName": "Highest Threat", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [ -544, -288 ],
+      "id": "067d2e24-6b3d-4e7a-8216-7e811e9927c7",
+      "name": "Append row in sheet1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $vars.GOOGLE_SHEETS_DOC_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=1549957976",
+          "mode": "url"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "= {{ $now.toFormat('yyyy-MM-dd') }}",
+            "Weekly Priority": "={{ $().item.json.weekly_priority }}",
+            "Urgent Fix 1": "={{ $().item.json.urgent_fixes[0] }}",
+            "Urgent Fix 2": "={{ $().item.json.urgent_fixes[1] }}",
+            " Marketing Angle 1": "={{ $().item.json.marketing_angles[0] }}",
+            "Marketing Angle 2": "={{ $().item.json.marketing_angles[1] }}",
+            "Marketing Angle 3": "={{ $().item.json.marketing_angles[2] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "Date", "displayName": "Date", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Weekly Priority", "displayName": "Weekly Priority", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Urgent Fix 1", "displayName": "Urgent Fix 1", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Urgent Fix 2", "displayName": "Urgent Fix 2", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": " Marketing Angle 1", "displayName": " Marketing Angle 1", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Marketing Angle 2", "displayName": "Marketing Angle 2", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "Marketing Angle 3", "displayName": "Marketing Angle 3", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [ -192, -272 ],
+      "id": "1214cb9f-ac20-4c7d-ac8c-663dd0bbe3d7",
+      "name": "Append row in sheet2",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nlet text = \"\";\n\nif (response.candidates && response.candidates[0]) {\n  text = response.candidates[0].content.parts[0].text;\n} else if (response.content && response.content.parts) {\n  text = response.content.parts[0].text;\n}\n\ntext = text.replace(/```json/g, \"\").replace(/```/g, \"\").trim();\n\ntry {\n  const parsed = JSON.parse(text);\n  return [{ json: parsed }];\n} catch(e) {\n  return [{ json: { raw_response: text, parse_error: e.message } }];\n}\n\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [ 64, -64 ],
+      "id": "30784c1f-554e-4e92-8d5b-9b4a461b990d",
+      "name": "Parser3"
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\n\nconsole.log(JSON.stringify(response));\n\nlet text = \"\";\n\nif (response.candidates && response.candidates[0]) {\n  text = response.candidates[0].content.parts[0].text;\n} else if (response.content && response.content.parts) {\n  text = response.content.parts[0].text;\n} else if (response.parts && response.parts[0]) {\n  text = response.parts[0].text;\n} else if (typeof response.text === \"string\") {\n  text = response.text;\n}\n\nif (!text) {\n  return [{ json: { error: \"Could not extract text\", full_response: response } }];\n}\n\ntext = text.replace(/```json/g, \"\").replace(/```/g, \"\").trim();\n\ntry {\n  const parsed = JSON.parse(text);\n  return [{ json: parsed }];\n} catch(e) {\n  return [{ json: { raw_response: text, parse_error: e.message } }];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [ -752, -64 ],
+      "id": "fbf38c54-aef8-41f9-8a23-cae3f03ef3fe",
+      "name": "Parser1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nlet text = \"\";\n\nif (response.candidates && response.candidates[0]) {\n  text = response.candidates[0].content.parts[0].text;\n} else if (response.content && response.content.parts) {\n  text = response.content.parts[0].text;\n}\n\ntext = text.replace(/```json/g, \"\").replace(/```/g, \"\").trim();\n\ntry {\n  const parsed = JSON.parse(text);\n  return [{ json: parsed }];\n} catch(e) {\n  return [{ json: { raw_response: text, parse_error: e.message } }];\n}\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [ -352, -64 ],
+      "id": "d34d1944-f2b4-4807-b598-ce3d5844a520",
+      "name": "Parser2"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [[{ "node": "Run an Actor and get dataset", "type": "main", "index": 0 }]]
+    },
+    "Run an Actor and get dataset": {
+      "main": [[{ "node": "Data_cleaning", "type": "main", "index": 0 }]]
+    },
+    "Data_cleaning": {
+      "main": [[{ "node": "categorised_by_productType", "type": "main", "index": 0 }]]
+    },
+    "categorised_by_productType": {
+      "main": [[{ "node": "Gap Analyst", "type": "main", "index": 0 }]]
+    },
+    "Gap Analyst": {
+      "main": [[{ "node": "Parser1", "type": "main", "index": 0 }]]
+    },
+    "Strategist": {
+      "main": [[{ "node": "Parser2", "type": "main", "index": 0 }]]
+    },
+    "Analyze document": {
+      "main": [[{ "node": "Parser3", "type": "main", "index": 0 }]]
+    },
+    "Parser3": {
+      "main": [[{ "node": "Append row in sheet", "type": "main", "index": 0 }]]
+    },
+    "Parser1": {
+      "main": [[
+        { "node": "Strategist", "type": "main", "index": 0 },
+        { "node": "Append row in sheet1", "type": "main", "index": 0 }
+      ]]
+    },
+    "Parser2": {
+      "main": [[
+        { "node": "Analyze document", "type": "main", "index": 0 },
+        { "node": "Append row in sheet2", "type": "main", "index": 0 }
+      ]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "tags": []
+}
