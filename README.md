@@ -19,7 +19,7 @@
 ## 📺 Demo
 
 <<<<<<< HEAD
-https://github.com/user-attachments/assets/356c6cbe-2482-4e41-a646-5a8e3c632415
+
 =======
 > 🎬 **Video walkthrough coming soon** — showing full pipeline run on Soulflower vs WOW vs Mamaearth
 
